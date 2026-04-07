@@ -36,8 +36,6 @@ def _build_trial_run_fns(
     learning_rate: float,
     eta: float,
     ppo_epsilon: float,
-    pmpo_alpha: float,
-    pmpo_beta: float,
     ppo_epochs: int,
     k_candidates: int | None,
     target_type: str,
@@ -122,11 +120,6 @@ def _build_trial_run_fns(
             actions,
         ]
 
-    def compute_full_log_probs(params, prompts, actions):
-        full_seq = jnp.concatenate([prompts, actions], axis=1)
-        all_log_probs = model.apply(params, full_seq)
-        return all_log_probs[:, sequence_length - 1 : 2 * sequence_length - 1, :]
-
     from optax.contrib import muon as optax_muon
 
     optimizer = optax_muon(learning_rate=learning_rate * 10)
@@ -185,40 +178,6 @@ def _build_trial_run_fns(
             opt_state,
             loss_fn,
             ppo_epochs,
-        )
-        return new_params, new_opt_state, 1.0 - rewards.mean()
-
-    def pmpo_step(params, opt_state, key):
-        prompts, actions, _, rewards = rollout(params, key)
-        episode_rewards = rewards.mean(axis=1)
-        advantages = episode_rewards - episode_rewards.mean()
-        old_full_lp = jax.lax.stop_gradient(
-            compute_full_log_probs(params, prompts, actions)
-        )
-        weights = jax.lax.stop_gradient(jax.nn.softmax(advantages / pmpo_alpha))
-
-        def pmpo_epoch(carry, _):
-            p, os_ = carry
-
-            def loss_fn(p_inner):
-                new_full_lp = compute_full_log_probs(p_inner, prompts, actions)
-                new_lp = new_full_lp[
-                    jnp.arange(batch_size)[:, None],
-                    jnp.arange(sequence_length)[None, :],
-                    actions,
-                ]
-                wmle = -(weights * new_lp.sum(axis=1)).sum()
-                kl = (jnp.exp(new_full_lp) * (new_full_lp - old_full_lp)).sum(axis=-1)
-                kl_loss = kl.sum(axis=1).mean()
-                return wmle + pmpo_beta * kl_loss
-
-            _, grads = jax.value_and_grad(loss_fn)(p)
-            updates, new_os = optimizer.update(grads, os_, p)
-            new_p = optax.apply_updates(p, updates)
-            return (new_p, new_os), None
-
-        (new_params, new_opt_state), _ = jax.lax.scan(
-            pmpo_epoch, (params, opt_state), None, length=ppo_epochs
         )
         return new_params, new_opt_state, 1.0 - rewards.mean()
 
@@ -691,7 +650,6 @@ def _build_trial_run_fns(
         "reinforce": reinforce_step,
         "dg": dg_step,
         "ppo": ppo_step,
-        "pmpo": pmpo_step,
         "tpo": tpo_step,
         "tpo_no_anchor": tpo_no_anchor_step,
         "tpo_token": tpo_token_step,
@@ -741,8 +699,6 @@ def run_trial(
     learning_rate,
     eta,
     ppo_epsilon,
-    pmpo_alpha,
-    pmpo_beta,
     ppo_epochs,
     k_candidates=None,
     target_type,
@@ -768,8 +724,6 @@ def run_trial(
         learning_rate,
         eta,
         ppo_epsilon,
-        pmpo_alpha,
-        pmpo_beta,
         ppo_epochs,
         k_candidates,
         target_type,

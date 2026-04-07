@@ -102,8 +102,6 @@ class TransformerConfig:
     learning_rate: float = 1e-4
     eta: float = 1.0
     ppo_epsilon: float = 0.2
-    pmpo_alpha: float = 0.6
-    pmpo_beta: float = 0.1
     ppo_epochs: int = 4
     k_candidates: int = 8
     tpo_eta: float = 1.0
@@ -136,8 +134,6 @@ class TransformerVariationsConfig:
     learning_rate: float = 1e-4
     eta: float = 1.0
     ppo_epsilon: float = 0.2
-    pmpo_alpha: float = 0.6
-    pmpo_beta: float = 0.1
     ppo_epochs: int = 4
     k_candidates: int = 8
     tpo_eta: float = 1.0

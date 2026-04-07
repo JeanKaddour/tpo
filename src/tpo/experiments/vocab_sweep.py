@@ -54,8 +54,6 @@ def run_vocab_sweep(
             learning_rate=config.learning_rate,
             eta=config.eta,
             ppo_epsilon=config.ppo_epsilon,
-            pmpo_alpha=config.pmpo_alpha,
-            pmpo_beta=config.pmpo_beta,
             ppo_epochs=config.ppo_epochs,
             k_candidates=config.k_candidates,
             target_type="reverse_copy",

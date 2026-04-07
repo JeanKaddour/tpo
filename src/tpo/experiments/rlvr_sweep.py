@@ -64,8 +64,6 @@ def _run_match(
                 learning_rate=learning_rate,
                 eta=config.eta,
                 ppo_epsilon=config.ppo_epsilon,
-                pmpo_alpha=0.6,
-                pmpo_beta=0.1,
                 ppo_epochs=config.ppo_epochs,
                 k_candidates=config.k_candidates,
                 target_type="reverse_copy",
