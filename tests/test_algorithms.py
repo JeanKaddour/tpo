@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from jax import random as jr
 
 from tpo.algorithms import (
@@ -13,17 +14,17 @@ from tpo.algorithms import (
 )
 
 
-def test_tpo_skill_zero_variance_returns_centered_scores():
+def test_tpo_skill_zero_variance_returns_centered_scores() -> None:
     scores = np.array([[2.0, 2.0, 2.0]], dtype=np.float32)
     skill = np.asarray(tpo_skill(scores))
     np.testing.assert_allclose(skill, np.zeros_like(scores))
 
 
-def test_tpo_target_is_normalized_and_anchor_sensitive():
+def test_tpo_target_is_normalized_and_anchor_sensitive() -> None:
     log_scores_old = np.log(np.array([[0.7, 0.2, 0.1]], dtype=np.float32))
     scores = np.array([[1.0, 0.0, -1.0]], dtype=np.float32)
 
-    target = np.asarray(tpo_target(log_scores_old, scores))
+    target = np.asarray(tpo_target(jnp.asarray(log_scores_old), scores))
     no_anchor = np.asarray(tpo_target_no_anchor(scores))
 
     np.testing.assert_allclose(
@@ -35,7 +36,7 @@ def test_tpo_target_is_normalized_and_anchor_sensitive():
     assert target[0, 0] > no_anchor[0, 0]
 
 
-def test_classification_tpo_loss_matches_shared_feedback_path():
+def test_classification_tpo_loss_matches_shared_feedback_path() -> None:
     logits = np.array(
         [[2.0, 0.5, -1.0], [0.1, -0.2, 1.3]],
         dtype=np.float32,
@@ -58,7 +59,7 @@ def test_classification_tpo_loss_matches_shared_feedback_path():
     np.testing.assert_allclose(direct, shared, atol=1e-6)
 
 
-def test_classification_group_pg_loss_matches_shared_feedback_path():
+def test_classification_group_pg_loss_matches_shared_feedback_path() -> None:
     logits = np.array(
         [[1.5, -0.5, 0.0], [0.2, 0.7, -1.3]],
         dtype=np.float32,

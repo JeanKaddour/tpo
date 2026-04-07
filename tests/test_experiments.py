@@ -1,3 +1,7 @@
+from collections.abc import Callable
+from pathlib import Path
+from typing import cast
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -18,7 +22,9 @@ from tpo.experiments import (
 )
 
 
-def test_terminal_reward_ablations_use_tpo_eta_for_tpo_targets(tmp_path, monkeypatch):
+def test_terminal_reward_ablations_use_tpo_eta_for_tpo_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = TerminalRewardAblationsConfig(
         num_seeds=1,
         sequence_length=1,
@@ -33,7 +39,10 @@ def test_terminal_reward_ablations_use_tpo_eta_for_tpo_targets(tmp_path, monkeyp
     )
     seen_etas: list[float] = []
 
-    def fake_tpo_target(log_scores_old, episode_scores, eta):
+    def fake_tpo_target(
+        log_scores_old: jax.Array, episode_scores: jax.Array, eta: float
+    ) -> jax.Array:
+        del episode_scores
         seen_etas.append(eta)
         return jnp.ones_like(log_scores_old) / log_scores_old.shape[1]
 
@@ -61,8 +70,11 @@ def test_terminal_reward_ablations_use_tpo_eta_for_tpo_targets(tmp_path, monkeyp
     ],
 )
 def test_causal_ablations_forward_tpo_eta(
-    tmp_path, monkeypatch, run_fn, expected_calls
-):
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    run_fn: Callable[[CausalAblationsConfig], tuple[dict, Path]],
+    expected_calls: int,
+) -> None:
     cfg = CausalAblationsConfig(
         num_seeds=2,
         sequence_length=2,
@@ -74,13 +86,14 @@ def test_causal_ablations_forward_tpo_eta(
         tpo_eta=0.125,
         save_dir=str(tmp_path),
     )
-    calls: list[dict] = []
+    calls: list[dict[str, object]] = []
 
-    def fake_run_trial(**kwargs):
+    def fake_run_trial(**kwargs: object) -> dict[str, np.ndarray]:
         calls.append(kwargs)
+        algorithms = cast(tuple[str, ...], kwargs["algorithms"])
         return {
             algo: np.zeros((cfg.num_seeds, cfg.num_episodes), dtype=np.float32)
-            for algo in kwargs["algorithms"]
+            for algo in algorithms
         }
 
     monkeypatch.setattr(causal_ablations, "run_trial", fake_run_trial)
@@ -104,7 +117,9 @@ def test_causal_ablations_forward_tpo_eta(
     assert {call["tpo_eta"] for call in calls} == {cfg.tpo_eta}
 
 
-def test_transformer_rlvr_forwards_tpo_eta(tmp_path, monkeypatch):
+def test_transformer_rlvr_forwards_tpo_eta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = TransformerRlvrConfig(
         num_seeds=2,
         sequence_length=2,
@@ -114,13 +129,14 @@ def test_transformer_rlvr_forwards_tpo_eta(tmp_path, monkeypatch):
         tpo_eta=0.125,
         save_dir=str(tmp_path),
     )
-    calls: list[dict] = []
+    calls: list[dict[str, object]] = []
 
-    def fake_run_trial(**kwargs):
+    def fake_run_trial(**kwargs: object) -> dict[str, np.ndarray]:
         calls.append(kwargs)
+        algorithms = cast(tuple[str, ...], kwargs["algorithms"])
         return {
             algo: np.zeros((cfg.num_seeds, cfg.num_episodes), dtype=np.float32)
-            for algo in kwargs["algorithms"]
+            for algo in algorithms
         }
 
     monkeypatch.setattr(transformer_rlvr, "run_trial", fake_run_trial)
@@ -134,7 +150,9 @@ def test_transformer_rlvr_forwards_tpo_eta(tmp_path, monkeypatch):
     assert calls[0]["tpo_eta"] == cfg.tpo_eta
 
 
-def test_rlvr_sweep_interactions_only_skips_prompt_runs(tmp_path, monkeypatch):
+def test_rlvr_sweep_interactions_only_skips_prompt_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = TransformerRlvrConfig(
         num_seeds=2,
         num_episodes=3,
@@ -142,7 +160,12 @@ def test_rlvr_sweep_interactions_only_skips_prompt_runs(tmp_path, monkeypatch):
     )
     matches: list[str] = []
 
-    def fake_run_match(config, algorithms, sequence_lengths, match):
+    def fake_run_match(
+        config: TransformerRlvrConfig,
+        algorithms: tuple[str, ...],
+        sequence_lengths: tuple[int, ...],
+        match: str,
+    ) -> dict[int, dict[str, np.ndarray]]:
         matches.append(match)
         return {
             sequence_length: {
@@ -152,7 +175,12 @@ def test_rlvr_sweep_interactions_only_skips_prompt_runs(tmp_path, monkeypatch):
             for sequence_length in sequence_lengths
         }
 
-    def fake_plot_match_grid(all_results, sequence_lengths, figure_path):
+    def fake_plot_match_grid(
+        all_results: dict[int, dict[str, np.ndarray]],
+        sequence_lengths: tuple[int, ...],
+        figure_path: Path,
+    ) -> None:
+        del all_results, sequence_lengths
         figure_path.write_bytes(b"")
 
     monkeypatch.setattr(rlvr_sweep, "_run_match", fake_run_match)
@@ -171,9 +199,60 @@ def test_rlvr_sweep_interactions_only_skips_prompt_runs(tmp_path, monkeypatch):
     assert report.artifact_paths[1].exists()
 
 
+def test_rlvr_sweep_both_returns_scoped_raw_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = TransformerRlvrConfig(
+        num_seeds=2,
+        num_episodes=3,
+        save_dir=str(tmp_path),
+    )
+    matches: list[str] = []
+
+    def fake_run_match(
+        config: TransformerRlvrConfig,
+        algorithms: tuple[str, ...],
+        sequence_lengths: tuple[int, ...],
+        match: str,
+    ) -> dict[int, dict[str, np.ndarray]]:
+        matches.append(match)
+        return {
+            sequence_length: {
+                algo: np.zeros((config.num_seeds, config.num_episodes), dtype=np.float32)
+                for algo in algorithms
+            }
+            for sequence_length in sequence_lengths
+        }
+
+    def fake_plot_combined_grid(
+        prompt_results: dict[int, dict[str, np.ndarray]],
+        interaction_results: dict[int, dict[str, np.ndarray]],
+        sequence_lengths: tuple[int, ...],
+        figure_path: Path,
+    ) -> None:
+        del prompt_results, interaction_results, sequence_lengths
+        figure_path.write_bytes(b"")
+
+    monkeypatch.setattr(rlvr_sweep, "_run_match", fake_run_match)
+    monkeypatch.setattr(rlvr_sweep, "_plot_combined_grid", fake_plot_combined_grid)
+
+    report = rlvr_sweep.run_rlvr_sweep(
+        cfg,
+        algorithms=("ppo",),
+        sequence_lengths=(3,),
+        match="both",
+        verbose=False,
+    )
+
+    assert matches == ["prompts", "interactions"]
+    assert report.artifact_paths[0].exists()
+    assert report.artifact_paths[1].exists()
+    assert set(report.raw_errors) == {"prompts", "interactions"}
+
+
 def test_transformer_variations_interactions_only_skips_prompt_collection(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = TransformerVariationsConfig(
         num_seeds=2,
         num_episodes=3,
@@ -182,7 +261,12 @@ def test_transformer_variations_interactions_only_skips_prompt_collection(
     collected_matches: list[str] = []
     logged_matches: list[str] = []
 
-    def fake_collect_results(config, algorithms, *, match):
+    def fake_collect_results(
+        config: TransformerVariationsConfig,
+        algorithms: tuple[str, ...],
+        *,
+        match: str,
+    ) -> dict[tuple[str, str], dict[str, np.ndarray]]:
         collected_matches.append(match)
         return {
             (target_type, reward_type): {
@@ -193,10 +277,23 @@ def test_transformer_variations_interactions_only_skips_prompt_collection(
             for reward_type in transformer_variations.REWARD_TYPES
         }
 
-    def fake_log_match_runs(config, algorithms, match, all_results):
+    def fake_log_match_runs(
+        config: TransformerVariationsConfig,
+        algorithms: tuple[str, ...],
+        match: str,
+        all_results: dict[tuple[str, str], dict[str, np.ndarray]],
+    ) -> None:
+        del config, algorithms, all_results
         logged_matches.append(match)
 
-    def fake_plot_single_match(config, algorithms, match, all_results, figure_path):
+    def fake_plot_single_match(
+        config: TransformerVariationsConfig,
+        algorithms: tuple[str, ...],
+        match: str,
+        all_results: dict[tuple[str, str], dict[str, np.ndarray]],
+        figure_path: Path,
+    ) -> None:
+        del config, algorithms, match, all_results
         figure_path.write_bytes(b"")
 
     monkeypatch.setattr(
