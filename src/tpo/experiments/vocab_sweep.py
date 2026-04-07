@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .._typing import savez_dict
 from ..config import TransformerConfig, coerce_config
 from ..tracking import CurveReport, ExperimentReport
 from ._trial import run_trial
@@ -67,9 +68,9 @@ def run_vocab_sweep(
     save_dir = Path(config.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
     raw_path = save_dir / "transformer_vocab_sweep.npz"
-    np.savez(
+    savez_dict(
         raw_path,
-        **{
+        {
             f"v{vocab_size}_{algo}": values
             for vocab_size, results in all_results.items()
             for algo, values in results.items()
@@ -141,7 +142,7 @@ def run_vocab_sweep(
             ncol=len(handles),
             bbox_to_anchor=(0.5, 1.04),
         )
-    fig.tight_layout(rect=[0, 0, 1, 0.92], w_pad=1.0)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.92), w_pad=1.0)
 
     figure_path = save_dir / "transformer_vocab_sweep.png"
     fig.savefig(figure_path, dpi=150, bbox_inches="tight")

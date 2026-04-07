@@ -2,6 +2,8 @@
 
 import flax.linen as nn
 
+from ._typing import Array, MetricSeries
+
 
 class PolicyMLP(nn.Module):
     """MLP policy for MNIST contextual bandit: images → logits."""
@@ -10,7 +12,7 @@ class PolicyMLP(nn.Module):
     num_actions: int = 10
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, x: MetricSeries) -> Array:
         for h in self.hidden_sizes:
             x = nn.Dense(h)(x)
             x = nn.relu(x)
@@ -32,7 +34,7 @@ class CausalTransformer(nn.Module):
     ffn_mult: int = 4
 
     @nn.compact
-    def __call__(self, tokens):
+    def __call__(self, tokens: Array) -> Array:
         """Forward pass.
 
         Args:

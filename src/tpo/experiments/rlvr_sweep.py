@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .._typing import ResultsByLength, ScopedResultsByLength, savez_dict
 from ..config import TransformerRlvrConfig, coerce_config
 from ..tracking import CurveReport, ExperimentReport
 from ._trial import run_trial
@@ -127,7 +128,7 @@ def _plot_match_grid(
             ncol=len(handles),
             bbox_to_anchor=(0.5, 1.04),
         )
-    fig.tight_layout(rect=[0, 0, 1, 0.92], w_pad=1.0)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.92), w_pad=1.0)
     fig.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -191,7 +192,7 @@ def _plot_combined_grid(
             ncol=len(handles),
             bbox_to_anchor=(0.5, 1.02),
         )
-    fig.tight_layout(rect=[0, 0, 1, 0.94], w_pad=1.0, h_pad=1.0)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94), w_pad=1.0, h_pad=1.0)
     fig.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -220,12 +221,12 @@ def run_rlvr_sweep(
         f"algorithms={','.join(algo_list)}..."
     )
 
-    prompt_results = (
+    prompt_results: ResultsByLength = (
         _run_match(config, algo_list, sequence_lengths, "prompts")
         if match in {"prompts", "both"}
         else {}
     )
-    interaction_results = (
+    interaction_results: ResultsByLength = (
         _run_match(config, algo_list, sequence_lengths, "interactions")
         if match in {"interactions", "both"}
         else {}
@@ -237,14 +238,14 @@ def run_rlvr_sweep(
     artifact_paths: list[Path] = []
     if match == "both":
         raw_path = save_dir / "rlvr_sweep_combined.npz"
-        np.savez(
+        savez_dict(
             raw_path,
-            **{
+            {
                 f"prompts_h{h}_{algo}": values
                 for h, results in prompt_results.items()
                 for algo, values in results.items()
-            },
-            **{
+            }
+            | {
                 f"interactions_h{h}_{algo}": values
                 for h, results in interaction_results.items()
                 for algo, values in results.items()
@@ -254,25 +255,26 @@ def run_rlvr_sweep(
         _plot_combined_grid(
             prompt_results, interaction_results, sequence_lengths, figure_path
         )
-        selected_results = {
+        scoped_results: ScopedResultsByLength = {
             "prompts": prompt_results,
             "interactions": interaction_results,
         }
+        raw_errors: ScopedResultsByLength | ResultsByLength = scoped_results
     else:
         label = match
         raw_path = save_dir / f"rlvr_sweep_{label}.npz"
-        selected = prompt_results if match == "prompts" else interaction_results
-        np.savez(
+        selected_results = prompt_results if match == "prompts" else interaction_results
+        savez_dict(
             raw_path,
-            **{
+            {
                 f"h{h}_{algo}": values
-                for h, results in selected.items()
+                for h, results in selected_results.items()
                 for algo, values in results.items()
             },
         )
         figure_path = save_dir / f"rlvr_sweep_{label}.png"
-        _plot_match_grid(selected, sequence_lengths, figure_path)
-        selected_results = selected
+        _plot_match_grid(selected_results, sequence_lengths, figure_path)
+        raw_errors = selected_results
     artifact_paths.extend([figure_path, raw_path])
 
     print(f"  Saved {figure_path}")
@@ -281,7 +283,7 @@ def run_rlvr_sweep(
     summary: dict[str, float] = {}
     curves: list[CurveReport] = []
     if match == "both":
-        for scope, results_by_h in selected_results.items():
+        for scope, results_by_h in scoped_results.items():
             for sequence_length in sequence_lengths:
                 results = results_by_h[sequence_length]
                 episodes = np.arange(next(iter(results.values())).shape[1])
@@ -362,5 +364,5 @@ def run_rlvr_sweep(
         summary=summary,
         curves=tuple(curves),
         artifact_paths=tuple(artifact_paths),
-        raw_errors=selected_results,
+        raw_errors=raw_errors,
     )

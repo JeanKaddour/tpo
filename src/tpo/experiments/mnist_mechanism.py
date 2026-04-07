@@ -11,6 +11,7 @@ import jax.random as jr
 import numpy as np
 import optax
 
+from .._typing import NumpyArray, savez_dict
 from ..algorithms import (
     classification_dg_loss,
     classification_grpo_loss,
@@ -304,7 +305,7 @@ def run_mnist_mechanism(
         * config.eval_every
     )
 
-    results: dict[str, dict[str, np.ndarray]] = {}
+    results: dict[str, dict[str, NumpyArray]] = {}
     for algo_name in algo_names:
         if algo_name not in MECHANISM_ALGORITHMS:
             raise ValueError(
@@ -320,9 +321,9 @@ def run_mnist_mechanism(
             config.eval_every,
         )
         print(f"  Training {algo_name} with mechanism diagnostics...")
-        errors, gain_by_bin, scalar_by_bin, counts_by_bin = run_fn(keys)
+        error_traces, gain_by_bin, scalar_by_bin, counts_by_bin = run_fn(keys)
         results[algo_name] = {
-            "errors": np.asarray(errors),
+            "errors": np.asarray(error_traces),
             "gain_by_bin": np.asarray(gain_by_bin),
             "scalar_gain_by_bin": np.asarray(scalar_by_bin),
             "surplus_gain_by_bin": np.asarray(gain_by_bin - scalar_by_bin),
@@ -334,9 +335,9 @@ def run_mnist_mechanism(
     save_dir = Path(config.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
     raw_path = save_dir / "mnist_mechanism.npz"
-    np.savez(
+    savez_dict(
         raw_path,
-        **{
+        {
             f"{algo}_{key}": value
             for algo, payload in results.items()
             for key, value in payload.items()
@@ -345,11 +346,11 @@ def run_mnist_mechanism(
     print(f"  Saved {raw_path}")
 
     summary: dict[str, float] = {}
-    series: dict[str, np.ndarray] = {}
+    series: dict[str, NumpyArray] = {}
     for algo, payload in results.items():
-        errors = payload["errors"]
-        mean = errors.mean(axis=0)
-        se = errors.std(axis=0) / np.sqrt(errors.shape[0])
+        error_values = payload["errors"]
+        mean = error_values.mean(axis=0)
+        se = error_values.std(axis=0) / np.sqrt(error_values.shape[0])
         summary[f"{algo}/final_error"] = float(mean[-1])
         series[f"{algo}_mean"] = mean
         series[f"{algo}_se"] = se

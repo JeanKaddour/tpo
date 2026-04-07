@@ -12,6 +12,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
+from tpo._typing import savez_dict
 from tpo.config import MnistConfig
 from tpo.experiments.mnist import run_mnist
 from tpo.runtime import bootstrap_runtime
@@ -47,13 +48,15 @@ def main() -> None:
 
     errors = {name: np.asarray(report.raw_errors[name]) for name in ALGORITHMS}
     steps = np.arange(errors["tpo"].shape[1], dtype=np.int32) * 200
-    np.savez(
+    savez_dict(
         RESULTS_PATH,
-        steps=steps,
-        num_seeds=np.int32(errors["tpo"].shape[0]),
-        num_steps=np.int32(10_000),
-        eval_every=np.int32(200),
-        **{f"{name}_errors": values for name, values in errors.items()},
+        {
+            "steps": steps,
+            "num_seeds": np.int32(errors["tpo"].shape[0]),
+            "num_steps": np.int32(10_000),
+            "eval_every": np.int32(200),
+            **{f"{name}_errors": values for name, values in errors.items()},
+        },
     )
 
     plt.rcParams.update(

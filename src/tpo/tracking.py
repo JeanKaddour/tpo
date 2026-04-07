@@ -2,12 +2,16 @@
 
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
+from dataclasses import is_dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping
 import os
 import uuid
 
 import numpy as np
+
+from ._typing import MetricMap, MetricSeries, PyTree
 
 WANDB_PUBLIC_ENV_KEYS = (
     "WANDB_API_KEY",
@@ -23,8 +27,8 @@ class CurveReport:
 
     name: str
     x_name: str
-    x_values: Sequence[float]
-    series: Mapping[str, Sequence[float]]
+    x_values: MetricSeries
+    series: MetricMap
     title: str | None = None
     plot_series: tuple[str, ...] = ()
 
@@ -38,7 +42,7 @@ class ExperimentReport:
     summary: Mapping[str, float]
     curves: tuple[CurveReport, ...] = field(default_factory=tuple)
     artifact_paths: tuple[Path, ...] = field(default_factory=tuple)
-    raw_errors: Mapping[str, object] = field(default_factory=dict)
+    raw_errors: Mapping[Any, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -104,7 +108,7 @@ def init_wandb_run(
     config: object,
     wandb_config: WandbConfig,
     smoke: bool = False,
-):
+) -> Any:
     """Initialize a WandB run before the experiment starts.
 
     Returns the run object so experiments can log progressively.
@@ -133,7 +137,7 @@ def log_experiment_report(
     report: ExperimentReport,
     wandb_config: WandbConfig,
     run_metadata: Mapping[str, object] | None = None,
-    run=None,
+    run: Any = None,
 ) -> None:
     """Log one experiment report to WandB if logging is enabled.
 
@@ -194,7 +198,8 @@ def log_experiment_report(
         summary_payload = {key: float(value) for key, value in report.summary.items()}
         elapsed = metadata.get("elapsed_seconds")
         if elapsed is not None:
-            summary_payload["runtime_seconds"] = float(elapsed)
+            if isinstance(elapsed, (int, float)):
+                summary_payload["runtime_seconds"] = float(elapsed)
         run.summary.update(summary_payload)
 
         _log_artifacts(run, wandb, report)
@@ -202,9 +207,9 @@ def log_experiment_report(
         run.finish()
 
 
-def _config_as_dict(config: object) -> dict:
+def _config_as_dict(config: object) -> dict[str, Any]:
     """Convert a dataclass config to a dict, returning {} for non-dataclasses."""
-    return asdict(config) if hasattr(config, "__dataclass_fields__") else {}
+    return asdict(config) if is_dataclass(config) and not isinstance(config, type) else {}
 
 
 def _env_value(source: Mapping[str, str], key: str) -> str | None:
@@ -216,7 +221,7 @@ def _env_value(source: Mapping[str, str], key: str) -> str | None:
     return value or None
 
 
-def _as_array(values: Sequence[float]) -> np.ndarray:
+def _as_array(values: MetricSeries) -> np.ndarray[Any, Any]:
     """Convert metric series to a flat numpy array."""
     return np.asarray(values, dtype=float).reshape(-1)
 
@@ -224,9 +229,10 @@ def _as_array(values: Sequence[float]) -> np.ndarray:
 def log_per_algorithm_runs(
     experiment_name: str,
     config: object,
-    algorithms: Sequence[tuple[str, dict[str, np.ndarray]]],
+    algorithms: tuple[tuple[str, dict[str, np.ndarray[Any, Any]]], ...]
+    | list[tuple[str, dict[str, np.ndarray[Any, Any]]]],
     x_name: str,
-    x_values: np.ndarray,
+    x_values: MetricSeries,
 ) -> None:
     """Create a separate wandb run per algorithm and log per-step metrics.
 
@@ -282,7 +288,7 @@ def log_per_algorithm_runs(
             run.finish()
 
 
-def _log_step_metrics(run, curves: tuple[CurveReport, ...]) -> None:
+def _log_step_metrics(run: Any, curves: tuple[CurveReport, ...]) -> None:
     """Log per-step metrics from all curves for wandb database queryability.
 
     Each series value is logged at every step so users can build arbitrary
@@ -310,7 +316,7 @@ def _log_step_metrics(run, curves: tuple[CurveReport, ...]) -> None:
         run.log(step_data[step], step=step)
 
 
-def _log_curve(run, wandb, curve: CurveReport) -> None:
+def _log_curve(run: Any, wandb: Any, curve: CurveReport) -> None:
     """Log a curve as both a table and a preview chart."""
     x_values = _as_array(curve.x_values)
     series = {name: _as_array(values) for name, values in curve.series.items()}
@@ -345,7 +351,7 @@ def _log_curve(run, wandb, curve: CurveReport) -> None:
     run.log({f"plots/{curve.name}": plot})
 
 
-def _log_artifacts(run, wandb, report: ExperimentReport) -> None:
+def _log_artifacts(run: Any, wandb: Any, report: ExperimentReport) -> None:
     """Attach output files to the current WandB run."""
     artifact_paths = [Path(path) for path in report.artifact_paths]
     if not artifact_paths:

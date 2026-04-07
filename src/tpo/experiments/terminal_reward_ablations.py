@@ -22,6 +22,7 @@ import optax
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from .._typing import NumpyArray, SeedRunner, savez_dict
 from ..algorithms import dg_loss, grpo_loss, ppo_loss, tpo_target
 from ..config import TRANSFORMER_MODEL, TerminalRewardAblationsConfig, coerce_config
 from ..core import dg_gate, flatten_pytree
@@ -76,7 +77,7 @@ ALGO_LABELS = {
 def _build_ablation_fns(
     cfg: TerminalRewardAblationsConfig,
     algorithms: tuple[str, ...],
-) -> dict[str, callable]:
+) -> dict[str, SeedRunner]:
     """Build vmapped, JIT-compiled runners for each requested algorithm."""
 
     sl = cfg.sequence_length
@@ -586,7 +587,7 @@ def _plot_ablation_results(results, cfg, save_dir):
         f"K={cfg.k_candidates}, B={cfg.batch_size})",
         fontsize=14,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
 
     fig_path = save_path / "terminal_reward_ablations.png"
     fig.savefig(fig_path, dpi=150, bbox_inches="tight")
@@ -604,7 +605,9 @@ def _plot_ablation_results(results, cfg, save_dir):
     return fig_path
 
 
-def _save_ablation_series_npz(results, save_dir):
+def _save_ablation_series_npz(
+    results: dict[str, NumpyArray], save_dir: str
+) -> Path:
     """Save mean/se diagnostic series so paper plots can be regenerated selectively."""
     save_path = Path(save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -617,7 +620,7 @@ def _save_ablation_series_npz(results, save_dir):
             series[f"{algo}_{name}_se"] = diag.std(axis=0) / np.sqrt(diag.shape[0])
 
     npz_path = save_path / "ablation_data.npz"
-    np.savez(npz_path, **series)
+    savez_dict(npz_path, series)
     return npz_path
 
 

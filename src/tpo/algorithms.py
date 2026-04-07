@@ -5,6 +5,7 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
+from ._typing import Array, MetricSeries, PRNGKey
 from .core import dg_gate
 
 
@@ -17,7 +18,7 @@ class ClassificationBanditFeedback(NamedTuple):
     rewards: jax.Array
 
 
-def _broadcast_like(log_probs, values):
+def _broadcast_like(log_probs: Array, values: MetricSeries) -> Array:
     """Broadcast 1-D per-episode values across a 2-D log-prob tensor."""
     values = jnp.asarray(values)
     if log_probs.ndim == 2 and values.ndim == 1:
@@ -25,7 +26,9 @@ def _broadcast_like(log_probs, values):
     return values
 
 
-def _compute_surprisal(log_probs, surprisal_clip=None):
+def _compute_surprisal(
+    log_probs: Array, surprisal_clip: float | None = None
+) -> Array:
     """Return per-sample surprisal, optionally clipped for stability."""
     surprisal = -log_probs
     if surprisal_clip is not None:
@@ -33,7 +36,7 @@ def _compute_surprisal(log_probs, surprisal_clip=None):
     return surprisal
 
 
-def sampled_action_log_probs(log_probs, actions):
+def sampled_action_log_probs(log_probs: Array, actions: MetricSeries) -> Array:
     """Gather per-sample log-probabilities for integer actions."""
 
     return jnp.take_along_axis(
@@ -41,16 +44,19 @@ def sampled_action_log_probs(log_probs, actions):
     ).squeeze(-1)
 
 
-def sampled_classification_advantage(probs, rewards):
+def sampled_classification_advantage(probs: Array, rewards: MetricSeries) -> Array:
     """One-step bandit advantage with the paper's expected baseline."""
 
     baseline = jnp.sum(jnp.asarray(probs) ** 2, axis=-1)
     return jnp.asarray(rewards) - baseline
 
 
-def sample_classification_bandit(logits, labels, key):
+def sample_classification_bandit(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey
+) -> ClassificationBanditFeedback:
     """Sample one-step bandit feedback from classification logits."""
 
+    logits = jnp.asarray(logits)
     log_probs = jax.nn.log_softmax(logits)
     probs = jax.nn.softmax(logits)
     actions = jax.random.categorical(key, logits)
@@ -63,13 +69,17 @@ def sample_classification_bandit(logits, labels, key):
     )
 
 
-def one_hot_score_matrix(actions, values, num_classes):
+def one_hot_score_matrix(
+    actions: MetricSeries, values: MetricSeries, num_classes: int
+) -> Array:
     """Return score vectors with one active coordinate per sampled action."""
 
     return jnp.asarray(values)[:, None] * jax.nn.one_hot(actions, num_classes)
 
 
-def classification_pg_loss_from_feedback(log_probs, probs, actions, rewards):
+def classification_pg_loss_from_feedback(
+    log_probs: Array, probs: Array, actions: MetricSeries, rewards: MetricSeries
+) -> Array:
     """REINFORCE loss for sampled classification-bandit feedback."""
 
     advantages = sampled_classification_advantage(probs, rewards)
@@ -77,7 +87,13 @@ def classification_pg_loss_from_feedback(log_probs, probs, actions, rewards):
     return reinforce_loss(logp_a, advantages)
 
 
-def classification_dg_loss_from_feedback(log_probs, probs, actions, rewards, eta=1.0):
+def classification_dg_loss_from_feedback(
+    log_probs: Array,
+    probs: Array,
+    actions: MetricSeries,
+    rewards: MetricSeries,
+    eta: float = 1.0,
+) -> Array:
     """DG loss for sampled classification-bandit feedback."""
 
     advantages = sampled_classification_advantage(probs, rewards)
@@ -85,7 +101,13 @@ def classification_dg_loss_from_feedback(log_probs, probs, actions, rewards, eta
     return dg_loss(logp_a, advantages, eta=eta)
 
 
-def classification_tpo_loss_from_feedback(log_probs, probs, actions, rewards, eta=1.0):
+def classification_tpo_loss_from_feedback(
+    log_probs: Array,
+    probs: Array,
+    actions: MetricSeries,
+    rewards: MetricSeries,
+    eta: float = 1.0,
+) -> Array:
     """Anchored TPO loss for sampled classification-bandit feedback."""
 
     advantages = sampled_classification_advantage(probs, rewards)
@@ -93,7 +115,9 @@ def classification_tpo_loss_from_feedback(log_probs, probs, actions, rewards, et
     return anchored_tpo_cross_entropy_loss(log_probs, scores, eta=eta)
 
 
-def classification_group_pg_loss_from_feedback(log_probs, probs, actions, rewards):
+def classification_group_pg_loss_from_feedback(
+    log_probs: Array, probs: Array, actions: MetricSeries, rewards: MetricSeries
+) -> Array:
     """Grouped scalar-weighted PG ablation for classification-bandit feedback."""
 
     advantages = sampled_classification_advantage(probs, rewards)
@@ -101,13 +125,20 @@ def classification_group_pg_loss_from_feedback(log_probs, probs, actions, reward
     return group_pg_cross_entropy_loss(log_probs, actions, scores)
 
 
-def classification_grpo_loss_from_feedback(log_probs, actions, rewards, eps=1e-8):
+def classification_grpo_loss_from_feedback(
+    log_probs: Array,
+    actions: MetricSeries,
+    rewards: MetricSeries,
+    eps: float = 1e-8,
+) -> Array:
     """Batch-standardized PG baseline for classification-bandit feedback."""
 
     return batch_standardized_pg_loss(log_probs, actions, rewards, eps=eps)
 
 
-def classification_pg_loss(logits, labels, key):
+def classification_pg_loss(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey
+) -> Array:
     """REINFORCE loss for one-step classification bandits."""
 
     batch = sample_classification_bandit(logits, labels, key)
@@ -119,7 +150,9 @@ def classification_pg_loss(logits, labels, key):
     )
 
 
-def classification_dg_loss(logits, labels, key, eta=1.0):
+def classification_dg_loss(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey, eta: float = 1.0
+) -> Array:
     """DG loss for one-step classification bandits."""
 
     batch = sample_classification_bandit(logits, labels, key)
@@ -132,7 +165,9 @@ def classification_dg_loss(logits, labels, key, eta=1.0):
     )
 
 
-def classification_tpo_loss(logits, labels, key, eta=1.0):
+def classification_tpo_loss(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey, eta: float = 1.0
+) -> Array:
     """Anchored TPO loss for one-step classification bandits."""
 
     batch = sample_classification_bandit(logits, labels, key)
@@ -145,7 +180,9 @@ def classification_tpo_loss(logits, labels, key, eta=1.0):
     )
 
 
-def classification_group_pg_loss(logits, labels, key):
+def classification_group_pg_loss(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey
+) -> Array:
     """Grouped scalar-weighted PG ablation for one-step classification bandits."""
 
     batch = sample_classification_bandit(logits, labels, key)
@@ -157,7 +194,9 @@ def classification_group_pg_loss(logits, labels, key):
     )
 
 
-def classification_grpo_loss(logits, labels, key, eps=1e-8):
+def classification_grpo_loss(
+    logits: MetricSeries, labels: MetricSeries, key: PRNGKey, eps: float = 1e-8
+) -> Array:
     """Batch-standardized PG baseline for one-step classification bandits."""
 
     batch = sample_classification_bandit(logits, labels, key)
@@ -169,7 +208,7 @@ def classification_grpo_loss(logits, labels, key, eps=1e-8):
     )
 
 
-def reinforce_loss(log_probs, advantages):
+def reinforce_loss(log_probs: Array, advantages: MetricSeries) -> Array:
     """REINFORCE loss for flat or sequential log-prob tensors."""
     adv = jax.lax.stop_gradient(_broadcast_like(log_probs, advantages))
     if log_probs.ndim == 2:
@@ -177,7 +216,12 @@ def reinforce_loss(log_probs, advantages):
     return -(adv * log_probs).mean()
 
 
-def dg_loss(log_probs, advantages, eta=1.0, surprisal_clip=None):
+def dg_loss(
+    log_probs: Array,
+    advantages: MetricSeries,
+    eta: float = 1.0,
+    surprisal_clip: float | None = None,
+) -> Array:
     """Delightful Policy Gradient loss."""
     adv = _broadcast_like(log_probs, advantages)
     surprisal = _compute_surprisal(log_probs, surprisal_clip=surprisal_clip)
@@ -187,7 +231,12 @@ def dg_loss(log_probs, advantages, eta=1.0, surprisal_clip=None):
     return -(weights * log_probs).mean()
 
 
-def ppo_loss(log_probs, old_log_probs, advantages, epsilon=0.2):
+def ppo_loss(
+    log_probs: Array,
+    old_log_probs: Array,
+    advantages: Array,
+    epsilon: float = 0.2,
+) -> Array:
     """PPO clipped surrogate loss."""
     adv = jax.lax.stop_gradient(advantages)
     old_lp = jax.lax.stop_gradient(old_log_probs)
@@ -202,7 +251,13 @@ def ppo_loss(log_probs, old_log_probs, advantages, epsilon=0.2):
     return -jnp.minimum(ratio * adv, clipped * adv).mean()
 
 
-def grpo_loss(log_probs, old_log_probs, advantages, epsilon=0.2, beta=0.04):
+def grpo_loss(
+    log_probs: Array,
+    old_log_probs: Array,
+    advantages: Array,
+    epsilon: float = 0.2,
+    beta: float = 0.04,
+) -> Array:
     """GRPO: clipped surrogate with optional reverse-KL penalty.
 
     Implements the grouped clipped policy-gradient loss used by the transformer
@@ -229,7 +284,7 @@ def grpo_loss(log_probs, old_log_probs, advantages, epsilon=0.2, beta=0.04):
     return -(surrogate - beta * kl).mean()
 
 
-def tpo_skill(scores):
+def tpo_skill(scores: MetricSeries) -> Array:
     """Compute the whitened TPO skill over the last dimension."""
     scores = jnp.asarray(scores)
     centered = scores - scores.mean(axis=-1, keepdims=True)
@@ -238,7 +293,7 @@ def tpo_skill(scores):
     return jnp.where(std > 1e-6, centered / safe_std, centered)
 
 
-def tpo_target(log_scores_old, scores, eta=1.0):
+def tpo_target(log_scores_old: Array, scores: MetricSeries, eta: float = 1.0) -> Array:
     """Compute the TPO mirror-descent target distribution.
 
     eta scales the whitened scores: skill / eta.  eta=1 (the default) uses
@@ -250,13 +305,15 @@ def tpo_target(log_scores_old, scores, eta=1.0):
     )
 
 
-def tpo_target_no_anchor(scores, eta=1.0):
+def tpo_target_no_anchor(scores: MetricSeries, eta: float = 1.0) -> Array:
     """Compute the no-anchor TPO target on the sampled candidate simplex."""
     skill = tpo_skill(scores)
     return jax.nn.softmax(skill / eta, axis=-1)
 
 
-def anchored_tpo_cross_entropy_loss(log_probs, scores, eta=1.0):
+def anchored_tpo_cross_entropy_loss(
+    log_probs: Array, scores: MetricSeries, eta: float = 1.0
+) -> Array:
     """Cross-entropy loss to the anchored TPO target for one-step bandits."""
 
     q = jax.lax.stop_gradient(
@@ -265,7 +322,9 @@ def anchored_tpo_cross_entropy_loss(log_probs, scores, eta=1.0):
     return -(q * log_probs).sum(axis=-1).mean()
 
 
-def group_pg_cross_entropy_loss(log_probs, actions, scores):
+def group_pg_cross_entropy_loss(
+    log_probs: Array, actions: MetricSeries, scores: MetricSeries
+) -> Array:
     """Scalar-weighted policy-gradient ablation using TPO's grouped signal."""
 
     skill = jax.lax.stop_gradient(tpo_skill(scores))
@@ -274,7 +333,12 @@ def group_pg_cross_entropy_loss(log_probs, actions, scores):
     return reinforce_loss(logp_a, action_skill)
 
 
-def batch_standardized_pg_loss(log_probs, actions, rewards, eps=1e-8):
+def batch_standardized_pg_loss(
+    log_probs: Array,
+    actions: MetricSeries,
+    rewards: MetricSeries,
+    eps: float = 1e-8,
+) -> Array:
     """Single-sample GRPO-like bandit loss with batch-standardized rewards."""
 
     logp_a = sampled_action_log_probs(log_probs, actions)

@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .._typing import ScopedVariantResults, VariantResults, savez_dict
 from ..config import TransformerVariationsConfig, coerce_config
 from ..tracking import CurveReport, ExperimentReport, log_per_algorithm_runs
 from ._trial import run_trial
@@ -207,7 +208,7 @@ def _plot_single_match(
             ncol=len(handles),
             bbox_to_anchor=(0.5, 1.02),
         )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
     fig.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -267,7 +268,7 @@ def _plot_combined_matches(
             ncol=len(handles),
             bbox_to_anchor=(0.5, 1.02),
         )
-    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.97))
     fig.savefig(figure_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -294,7 +295,7 @@ def run_transformer_variations(
         f"match={match}..."
     )
 
-    prompt_results = {}
+    prompt_results: VariantResults = {}
     if match in {"prompts", "both"}:
         prompt_results = _collect_results(config, algo_list, match="prompts")
         _log_match_runs(config, algo_list, "prompts", prompt_results)
@@ -302,7 +303,7 @@ def run_transformer_variations(
             algo_list, match="prompts", k_candidates=config.k_candidates
         )
 
-    interaction_results = {}
+    interaction_results: VariantResults = {}
     if match in {"interactions", "both"}:
         interaction_results = _collect_results(config, algo_list, match="interactions")
         _log_match_runs(config, algo_list, "interactions", interaction_results)
@@ -317,28 +318,31 @@ def run_transformer_variations(
         _plot_combined_matches(
             config, algo_list, prompt_results, interaction_results, figure_path
         )
-        np.savez(
+        savez_dict(
             raw_path,
-            **{
+            {
                 f"prompts_{target}_{reward}_{algo}": values
                 for (target, reward), payload in prompt_results.items()
                 for algo, values in payload.items()
-            },
-            **{
+            }
+            | {
                 f"interactions_{target}_{reward}_{algo}": values
                 for (target, reward), payload in interaction_results.items()
                 for algo, values in payload.items()
             },
         )
-        result_sets = {"prompts": prompt_results, "interactions": interaction_results}
+        result_sets: ScopedVariantResults = {
+            "prompts": prompt_results,
+            "interactions": interaction_results,
+        }
     else:
         result_set = prompt_results if match == "prompts" else interaction_results
         figure_path = save_dir / f"transformer_variations_{match}.png"
         raw_path = save_dir / f"transformer_variations_{match}.npz"
         _plot_single_match(config, algo_list, match, result_set, figure_path)
-        np.savez(
+        savez_dict(
             raw_path,
-            **{
+            {
                 f"{target}_{reward}_{algo}": values
                 for (target, reward), payload in result_set.items()
                 for algo, values in payload.items()

@@ -12,6 +12,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
+from tpo._typing import savez_dict
 from tpo.config import TransformerRlvrConfig
 from tpo.experiments.transformer_rlvr import run_transformer_rlvr
 from tpo.runtime import bootstrap_runtime
@@ -63,14 +64,16 @@ def main() -> None:
 
     errors = {name: np.asarray(report.raw_errors[name]) for name in ALGORITHMS}
     episodes = np.arange(errors["tpo"].shape[1], dtype=np.int32)
-    np.savez(
+    savez_dict(
         RESULTS_PATH,
-        episodes=episodes,
-        num_seeds=np.int32(errors["tpo"].shape[0]),
-        num_episodes=np.int32(2_000),
-        sequence_length=np.int32(10),
-        match="prompts",
-        **{f"{name}_errors": values for name, values in errors.items()},
+        {
+            "episodes": episodes,
+            "num_seeds": np.int32(errors["tpo"].shape[0]),
+            "num_episodes": np.int32(2_000),
+            "sequence_length": np.int32(10),
+            "match": "prompts",
+            **{f"{name}_errors": values for name, values in errors.items()},
+        },
     )
 
     plt.rcParams.update(

@@ -20,6 +20,7 @@ import jax.random as jr
 import numpy as np
 import optax
 
+from .._typing import NumpyArray, savez_dict
 from ..config import TRANSFORMER_MODEL, CausalAblationsConfig, coerce_config
 from ..models import CausalTransformer
 from ..tracking import CurveReport, ExperimentReport
@@ -34,12 +35,12 @@ _ALGO_STYLES = {
 }
 
 
-def _save_npz(save_dir: str, name: str, data: dict[str, np.ndarray]) -> Path:
+def _save_npz(save_dir: str, name: str, data: dict[str, NumpyArray]) -> Path:
     """Save results as npz and return the path."""
     p = Path(save_dir)
     p.mkdir(parents=True, exist_ok=True)
     path = p / f"{name}.npz"
-    np.savez(path, **data)
+    savez_dict(path, data)
     print(f"  Saved {path}")
     return path
 

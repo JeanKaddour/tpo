@@ -1,14 +1,25 @@
 """Local-first CLI for the standalone TPO paper artifact."""
 
 import argparse
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 import os
 from pathlib import Path
 import time
+from typing import Any, cast
 
 from .config import (
     EXPERIMENT_ORDER,
+    ExperimentConfig,
+    ExperimentName,
+    MnistConfig,
+    TabularMultiConfig,
+    TabularSingleConfig,
+    TerminalRewardAblationsConfig,
+    TransformerConfig,
+    TransformerRlvrConfig,
+    TransformerVariationsConfig,
     experiment_configs,
 )
 from .runtime import bootstrap_runtime
@@ -187,14 +198,16 @@ def _validate_match_selection(experiment: str, match: str | None) -> None:
     if not invalid:
         return
     names = ", ".join(invalid)
-    supported = ", ".join(_MATCH_CHOICES[invalid[0]])
+    supported_values = ", ".join(_MATCH_CHOICES[invalid[0]])
     raise ValueError(
-        f"--match {match!r} is not supported for {names}; choose one of: {supported}"
+        f"--match {match!r} is not supported for {names}; choose one of: {supported_values}"
     )
 
 
-def _override_config(config, args: argparse.Namespace):
-    updates = {}
+def _override_config(
+    config: ExperimentConfig, args: argparse.Namespace
+) -> ExperimentConfig:
+    updates: dict[str, object] = {}
     for field_name, value in (
         ("num_seeds", args.num_seeds),
         ("num_episodes", args.num_episodes),
@@ -210,10 +223,14 @@ def _override_config(config, args: argparse.Namespace):
     ):
         if value is not None and hasattr(config, field_name):
             updates[field_name] = value
-    return replace(config, **updates) if updates else config
+    return (
+        cast(ExperimentConfig, replace(config, **cast(dict[str, Any], updates)))
+        if updates
+        else config
+    )
 
 
-def _base_config(name: str, smoke: bool, save_dir: str):
+def _base_config(name: str, smoke: bool, save_dir: str) -> ExperimentConfig:
     presets = experiment_configs(smoke=smoke, save_dir=save_dir)
     if name == "vocab_sweep":
         return presets["transformer"]
@@ -221,11 +238,11 @@ def _base_config(name: str, smoke: bool, save_dir: str):
         return presets["transformer_rlvr"]
     if name == "mnist_mechanism":
         return presets["mnist"]
-    return presets[name]
+    return presets[cast(ExperimentName, name)]
 
 
 @contextmanager
-def _wandb_mode(no_wandb: bool):
+def _wandb_mode(no_wandb: bool) -> Iterator[None]:
     previous = os.environ.get("WANDB_MODE")
     if no_wandb:
         os.environ["WANDB_MODE"] = "disabled"
@@ -238,7 +255,7 @@ def _wandb_mode(no_wandb: bool):
             os.environ["WANDB_MODE"] = previous
 
 
-def _run_one(name: str, args: argparse.Namespace):
+def _run_one(name: str, args: argparse.Namespace) -> object:
     bootstrap_runtime()
 
     algorithms = _parse_algorithms(args.algorithms)
@@ -247,48 +264,74 @@ def _run_one(name: str, args: argparse.Namespace):
     if name == "tabular_single":
         from .experiments.tabular import run_single_context
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_single_context(config)
+        single_config = cast(
+            "TabularSingleConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_single_context(single_config)
     if name == "tabular_multi":
         from .experiments.tabular import run_multi_context
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_multi_context(config)
+        multi_config = cast(
+            "TabularMultiConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_multi_context(multi_config)
     if name == "mnist":
         from .experiments.mnist import run_mnist
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_mnist(config, algorithms=algorithms)
+        mnist_config = cast(
+            "MnistConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_mnist(mnist_config, algorithms=algorithms)
     if name == "mnist_mechanism":
         from .experiments.mnist_mechanism import run_mnist_mechanism
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_mnist_mechanism(config, algorithms=algorithms)
+        mechanism_config = cast(
+            "MnistConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_mnist_mechanism(mechanism_config, algorithms=algorithms)
     if name == "transformer":
         from .experiments.transformer import run_transformer
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_transformer(config, algorithms=algorithms, verbose=verbose)
+        transformer_config = cast(
+            "TransformerConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_transformer(
+            transformer_config, algorithms=algorithms, verbose=verbose
+        )
     if name == "vocab_sweep":
         from .experiments.vocab_sweep import run_vocab_sweep
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_vocab_sweep(config, algorithms=algorithms, verbose=verbose)
+        vocab_config = cast(
+            "TransformerConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_vocab_sweep(vocab_config, algorithms=algorithms, verbose=verbose)
     if name == "transformer_variations":
         from .experiments.transformer_variations import run_transformer_variations
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
+        variations_config = cast(
+            "TransformerVariationsConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
         return run_transformer_variations(
-            config,
+            variations_config,
             algorithms=algorithms,
             match=_default_match(name, args.match),
         )
     if name == "transformer_rlvr":
         from .experiments.transformer_rlvr import run_transformer_rlvr
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
+        rlvr_config = cast(
+            "TransformerRlvrConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
         return run_transformer_rlvr(
-            config,
+            rlvr_config,
             algorithms=algorithms,
             match=_default_match(name, args.match),
             verbose=verbose,
@@ -296,13 +339,16 @@ def _run_one(name: str, args: argparse.Namespace):
     if name == "rlvr_sweep":
         from .experiments.rlvr_sweep import run_rlvr_sweep
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
+        sweep_config = cast(
+            "TransformerRlvrConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
         sequence_lengths = _parse_sequence_lengths(args.sequence_lengths)
         kwargs = {}
         if sequence_lengths is not None:
             kwargs["sequence_lengths"] = sequence_lengths
         return run_rlvr_sweep(
-            config,
+            sweep_config,
             algorithms=algorithms,
             match=_default_match(name, args.match),
             verbose=verbose,
@@ -311,15 +357,21 @@ def _run_one(name: str, args: argparse.Namespace):
     if name == "terminal_reward_ablations":
         from .experiments.terminal_reward_ablations import run_terminal_reward_ablations
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
+        ablation_config = cast(
+            "TerminalRewardAblationsConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
         return run_terminal_reward_ablations(
-            config, algorithms=algorithms, verbose=verbose
+            ablation_config, algorithms=algorithms, verbose=verbose
         )
     if name == "causal_ablations":
         from .experiments.causal_ablations import run_causal_ablations
 
-        config = _override_config(_base_config(name, args.smoke, args.save_dir), args)
-        return run_causal_ablations(config, algorithms=algorithms, verbose=verbose)
+        causal_config = cast(
+            "TerminalRewardAblationsConfig",
+            _override_config(_base_config(name, args.smoke, args.save_dir), args),
+        )
+        return run_causal_ablations(causal_config, algorithms=algorithms, verbose=verbose)
 
     raise ValueError(f"Unknown experiment: {name}")
 

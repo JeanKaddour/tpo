@@ -3,8 +3,12 @@
 import jax
 import jax.numpy as jnp
 
+from ._typing import Array, MetricSeries, PyTree
 
-def dg_gate(advantage, surprisal, eta=1.0):
+
+def dg_gate(
+    advantage: MetricSeries, surprisal: MetricSeries, eta: float = 1.0
+) -> Array:
     """Compute the Delightful gate w = σ(U·ℓ / η).
 
     Args:
@@ -21,8 +25,10 @@ def dg_gate(advantage, surprisal, eta=1.0):
     return jax.nn.sigmoid(chi / eta)
 
 
-def cosine_misalignment(g1, g2):
+def cosine_misalignment(g1: MetricSeries, g2: MetricSeries) -> Array:
     """Return 1 - cos(g1, g2) for flat vectors."""
+    g1 = jnp.asarray(g1)
+    g2 = jnp.asarray(g2)
     dot = jnp.sum(g1 * g2)
     norm1 = jnp.sqrt(jnp.sum(g1**2) + 1e-12)
     norm2 = jnp.sqrt(jnp.sum(g2**2) + 1e-12)
@@ -30,7 +36,7 @@ def cosine_misalignment(g1, g2):
     return 1.0 - cos
 
 
-def flatten_pytree(pytree):
+def flatten_pytree(pytree: PyTree) -> Array:
     """Flatten a JAX pytree to a single 1-D array."""
     leaves = jax.tree_util.tree_leaves(pytree)
     if not leaves:
