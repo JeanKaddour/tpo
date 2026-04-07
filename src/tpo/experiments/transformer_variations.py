@@ -1,7 +1,5 @@
 """Task-variation sweep for dense token-level transformer grouping."""
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from pathlib import Path
 

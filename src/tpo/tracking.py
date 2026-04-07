@@ -1,7 +1,5 @@
 """Shared experiment reporting and optional Weights & Biases logging."""
 
-from __future__ import annotations
-
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path

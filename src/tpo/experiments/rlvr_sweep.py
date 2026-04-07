@@ -1,7 +1,5 @@
 """Sequence-length sweep for the terminal-reward transformer experiment."""
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from pathlib import Path
 

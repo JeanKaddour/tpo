@@ -9,8 +9,6 @@ Run locally:
     uv run python -m tpo.cli terminal_reward_ablations --smoke
 """
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from pathlib import Path
 

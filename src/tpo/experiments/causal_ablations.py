@@ -11,8 +11,6 @@ Run locally:
     uv run python -m tpo.cli causal_ablations --smoke
 """
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from pathlib import Path
 

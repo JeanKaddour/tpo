@@ -1,7 +1,5 @@
 """Dense-reward reverse-copy transformer experiment."""
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from pathlib import Path
 

@@ -1,7 +1,5 @@
 """Typed experiment configuration presets for the standalone TPO artifact."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, replace
 from typing import Literal, Mapping, TypeVar, Union
 

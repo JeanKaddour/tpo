@@ -1,7 +1,5 @@
 """Runtime bootstrap helpers for JAX CUDA library discovery."""
 
-from __future__ import annotations
-
 import ctypes
 import glob
 import os
