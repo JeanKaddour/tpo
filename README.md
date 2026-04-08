@@ -1,5 +1,7 @@
 # Target Policy Optimization
 
+**[Paper Link](https://arxiv.org/abs/2604.06159)**
+
 <p align="center">
   <img src="assets/mnist_contextual_bandit.png" alt="MNIST contextual bandit: TPO outperforms DG and GRPO" width="48%">
   <img src="assets/token_reversal_sparse_reward.png" alt="Sparse-reward token reversal: TPO solves the task while DG and GRPO stall" width="48%">
@@ -52,4 +54,18 @@ tpo/
 │   └── experiments/       # One runner per experiment
 ├── scripts/               # Standalone plot scripts for hero figures
 └── tests/
+```
+
+## Citation
+
+```bibtex
+@misc{kaddour2026targetpolicyoptimization,
+      title={Target Policy Optimization},
+      author={Jean Kaddour},
+      year={2026},
+      eprint={2604.06159},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2604.06159},
+}
 ```
