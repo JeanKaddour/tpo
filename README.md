@@ -23,12 +23,17 @@ Standard RL methods (GRPO, DG, PPO) entangle *which completions should gain prob
 cd tpo
 uv sync
 
+# Optional: Linux + NVIDIA GPU install
+# uv sync --extra cuda12
+
 # Fast smoke test (~1 min)
 uv run python -m tpo.cli all --smoke --no-wandb --save-dir /tmp/tpo-smoke
 
 # Run a full experiment (e.g. MNIST contextual bandit)
 uv run python -m tpo.cli mnist
 ```
+
+`uv sync` installs the CPU-safe default stack, including macOS. Only use `uv sync --extra cuda12` on Linux machines with an NVIDIA GPU and CUDA 12 support.
 
 ## Key Experiments
 

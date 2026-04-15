@@ -5,13 +5,18 @@ description = "Standalone TPO paper artifact"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "jax[cuda12]",
+    "jax",
     "flax",
     "optax",
     "matplotlib",
     "numpy",
     "wandb",
     "pytest",
+]
+
+[project.optional-dependencies]
+cuda12 = [
+    "jax[cuda12] ; sys_platform == 'linux'",
 ]
 
 [dependency-groups]
