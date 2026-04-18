@@ -1,6 +1,6 @@
 # Target Policy Optimization
 
-**[Paper Link](https://arxiv.org/abs/2604.06159)**
+**[Human-ready paper](https://arxiv.org/abs/2604.06159)** · **[Agent-ready paper](paper_for_agents/tpo_for_agents.md)** (markdown + PNG figures, for LLM agents)
 
 <p align="center">
   <img src="assets/mnist_contextual_bandit.png" alt="MNIST contextual bandit: TPO outperforms DG and GRPO" width="48%">
